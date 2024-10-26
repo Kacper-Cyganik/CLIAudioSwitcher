@@ -10,13 +10,16 @@ from prompt_toolkit.widgets import Box, Button, Frame, Label, TextArea
 from prompt_toolkit.styles import Style
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.key_binding.bindings.focus import focus_next, focus_previous
+import pulsectl
 
 
 class MenuApp:
     def __init__(self):
         # Initialize the application state
         self.current_menu = "Main"
-        self.text_area = TextArea(focusable=False, text="Toggle Audio & Display settings")
+        self.text_area = TextArea(
+            focusable=False, text="Toggle Audio & Display settings"
+        )
 
         # Set up the initial layout
         self.root_container = self.create_root_container()
@@ -33,12 +36,12 @@ class MenuApp:
                 ("text-area focused", "bg:#ff0000"),
             ]
         )
-        
+
         # Set up key bindings
         self.kb = KeyBindings()
         self.kb.add("tab")(focus_next)
         self.kb.add("s-tab")(focus_previous)
-        
+
         # Build the main application
         self.application = Application(
             layout=self.layout,
@@ -57,7 +60,8 @@ class MenuApp:
                         [
                             Box(
                                 body=HSplit(
-                                    self.create_buttons_for_current_menu(), padding=1
+                                    self.create_buttons_for_current_menu(),
+                                    padding=1,
                                 ),
                                 padding=1,
                                 style="class:left-pane",
@@ -84,7 +88,7 @@ class MenuApp:
         elif self.current_menu == "Audio":
             return [
                 Button("Volume", handler=self.volume_clicked),
-                Button("Balance", handler=self.audio_output_clicked),
+                Button("Output Source", handler=self.audio_output_clicked),
                 Button("Back", handler=self.show_main_menu),
             ]
         elif self.current_menu == "Display":
@@ -92,6 +96,17 @@ class MenuApp:
             return [
                 Button("Back", handler=self.show_main_menu),
             ]
+        elif self.current_menu == "Audio_Output_Source":
+            output_devices = self.get_output_audio_devices()
+            return [
+                Button(
+                    f"{output_device.description}",
+                    handler=lambda index=index: self.set_output_audio_device(
+                        output_devices, index
+                    ),
+                )
+                for index, output_device in enumerate(output_devices)
+            ] + [Button("Back", handler=self.audio_clicked)]
 
     def show_main_menu(self):
         """Switches to the main menu."""
@@ -115,6 +130,8 @@ class MenuApp:
     def audio_output_clicked(self):
         """Handles audio output."""
         self.text_area.text = "Audio output settings opened."
+        self.current_menu = "Audio_Output_Source"
+        self.update_display()
 
     def exit_clicked(self):
         """Exits the application."""
@@ -136,6 +153,16 @@ class MenuApp:
 
         # Update the app to show the new layout
         get_app().invalidate()
+
+    ### Audio utils
+    def get_output_audio_devices(self):
+        pulse = pulsectl.Pulse("my-client")
+        return pulse.sink_list()
+
+    def set_output_audio_device(self, audio_devices, index):
+        selected_source = audio_devices[index]
+        pulse = pulsectl.Pulse("my-client")
+        pulse.default_set(selected_source)  # Set the default source
 
     def run(self):
         """Runs the application."""
